@@ -8,6 +8,7 @@ The program is implemented into the notebook main.ipynb.
 The requirements are working installations of
 - `jupyter notebook`
 - `python3`
+
 Once these are there, the usage is as simple as opening the notebook main.ipynb e.g. in your favorite webbrowser and pressing the "fast-forward" button ("restart and run all").
 
 # citations
