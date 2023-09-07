@@ -1,13 +1,13 @@
 # forward-nu-flux-fit
 
-Based on an initial template by Felix Kling (felix.kling@desy.de), the main code is developed and maintained by Toni Mäkelä (toni.makela@cern.ch).
-The provided physics results examples reproduce the work by FK, TM and Sebastian Trojanowski (sebastian.trojanowski@ncbj.gov.pl).
+Developed and maintained by Toni Mäkelä (toni.makela@cern.ch).
+The provided physics results examples reproduce the work by TM, Felix Kling (felix.kling@desy.de), and Sebastian Trojanowski (sebastian.trojanowski@ncbj.gov.pl).
 
 # installation requirements and usage
 The program is implemented into the notebook main.ipynb. 
 The requirements are working installations of
-1) jupyter notebook
-2) python3
+- `jupyter notebook`
+- `python3`
 Once these are there, the usage is as simple as opening the notebook main.ipynb e.g. in your favorite webbrowser and pressing the "fast-forward" button ("restart and run all").
 
 # citations
