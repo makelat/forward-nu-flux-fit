@@ -75,7 +75,7 @@ Upon using this program and/or the predictions provided with it, please cite the
 
 * M. Fieg, F. Kling, H. Shulz, and T. Sjostrand, 
   “Tuning pythia for forward physics experiments,”. 
-  In preparation
+  arXiv:2309.08604 [hep-ph].
 
 
 `BKRS`
