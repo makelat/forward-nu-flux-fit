@@ -7,6 +7,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 import uproot
 import json
+import datetime
 
 ### ---------------------------------------------------------
 ### input/output
@@ -135,3 +136,61 @@ def convert_to_root(inputfiles, filename="example.root"):
         "seed"      : [0],
         "metakey"   : [0],
     }
+
+#Test automation for checking that revisions reproduce previous plots
+#Param  plotdata    an object containing the data to be printed
+#       testtag     the printout filename
+#       testsubdir  printouts produced into tests/testsubdir; e.g. notebook name
+#       mode        'plot'/'histo', assumes plotdata is plt.plot/hist return object.
+#                   If unspecified, assumes a list of vectors/lists, output as is
+def plotTest(plotdata,testtag,testsubdir='',mode=''):
+    
+    #Ensure relevant test directory structure exists
+    testdir = 'tests/'+testsubdir
+    if testdir[-1]!='/': testdir+='/'
+    testdirsplit = [t for t in testdir.split('/') if len(t)!=0]
+    for i in range(1,len(testdirsplit)+1):
+        currentpath = '/'.join(testdirsplit[:i])
+        if not os.path.exists(currentpath): 
+            os.mkdir(currentpath)
+            
+    #The first output is named "*_REFERENCE"; compare later-produced outputs with that
+    suffix = '.txt'
+    initmode = True
+    ref = '_REFERENCE'
+    outputpath = testdir + testtag
+    if os.path.exists(outputpath+ref+suffix): 
+        initmode = False
+        ref=''
+    
+    #Write x and y axes's data to output file, one column for each
+    f = open(outputpath+ref+suffix,"w")
+    plotdataT = plotdata  #Will be transposed/formatted if need be
+    if mode == 'plot': plotdataT = np.array(plotdata[-1].get_data()).T
+    elif mode == 'histo':
+        binslo = plotdata[1][:-1]
+        binshi = plotdata[1][1:]
+        vals   = plotdata[0]
+        plotdataT = [binslo, binshi, vals]
+    for vec in plotdataT:
+        for x in vec:
+            f.write(str(x)+"    ")
+        f.write('\n')
+    f.close()
+
+    #If a reference file already exists, compare this output to that    
+    if not initmode:
+        xref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=0)
+        yref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=1)
+        x    = np.loadtxt(outputpath                + suffix, usecols=0)
+        y    = np.loadtxt(outputpath                + suffix, usecols=1)
+        tol=0.001
+        xagree = sum([x[i]*(1.0+tol)>xref[i] and x[i]*(1.0-tol)<xref[i]
+                      for i in range(len(x))])
+        yagree = sum([y[i]*(1.0+tol)>yref[i] and y[i]*(1.0-tol)<yref[i]
+                      for i in range(len(y))])
+        f = open('tests.log','a')
+        if xagree != len(x) or yagree != len(y):
+            f.write(str(datetime.datetime.now())+' WARNING! test '+outputpath+' failed!')
+        else: f.write(str(datetime.datetime.now())+' test '+outputpath+' passed')
+        f.close()
