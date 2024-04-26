@@ -270,14 +270,78 @@ def decayLength(name,px,py,pz):
     momentum = np.sqrt(px**2 + py**2 + pz**2)
     return lifetime*clight*momentum/mass[name]
 
-#AUX function to format error messages in get_llr and terminate
+### ---------------------------------------------------------
+### Compute N bin uncertainty
+def uncbands(axes,ebins,rbins,ecenters,detector,baseline,infomat,cid):
+    
+    global vpidstrs
+    global Nptypes
+    global Ngp
+    
+    #Init
+    uncertainty = [0.0 for _ in vpidstrs]
+    Nrbins = len(rbins)-1
+    values, vectors = linalg.eig(infomat)
+    
+    #Add all r-bins's contributions to the uncertainty for each vpid
+    for rbin in range(Nrbins):           
+        rmin, rmax = rbins[rbin], rbins[rbin+1] 
+        for ivpidsgn,vpid in enumerate(vpidstrs):
+            base_entry = np.array(baseline[vpid]['n_int']).T[rbin]
+            for value,vector in zip(values, vectors.T):
+                if value<=0.0: continue  #Skip flat directions
+                point=vector/np.sqrt(value)
+                lambdavars = [point[sum([Ngp[m]-1 for m in range(n)]):sum([Ngp[m]-1 for m in range(n+1)])]\
+                              for n in range(Nptypes)]
+                lambdavars = [np.add(lambdavars[i],lambdaBL[i]) for i in range(len(lambdavars))]
+                varied = model(detector=detector,radN='_rad'+str(Nrbins), lambdamat=lambdavars,cid=cid)
+                entry = np.array(varied[vpid]['n_int']).T[rbin]
+                uncertainty[ivpidsgn] += (entry - base_entry)**2            
+    
+    #Combine uncertainties for N radial bins
+    for ivpidsgn,vpid in enumerate(vpidstrs):  #N.B. possibly 6 vpids here
+        base_entry_sum = np.array(baseline[vpid]['n_int']).T[0]
+        for rbin in range(1,Nrbins):
+            base_entry_sum = np.add(base_entry_sum, np.array(baseline[vpid]['n_int']).T[rbin])
+        uncertainty[ivpidsgn] = np.sqrt(uncertainty[ivpidsgn])
+        wgtp = 1+uncertainty[ivpidsgn]/base_entry_sum   #Uncertainties for fractional...
+        wgtm = 1-uncertainty[ivpidsgn]/base_entry_sum   #...uncs in lower panel
+        errhi = np.multiply(wgtp,base_entry_sum)  #Uncertainties for spectra...
+        errlo = np.multiply(wgtm,base_entry_sum)  #...histos (upper panel)
+
+        #Plot N radial bin combined uncertainty
+        ivpid = int(np.floor(0.5*int(ivpidsgn))) if cid else ivpidsgn
+        lstyle = 'dotted' if '-' in vpid else 'solid'
+        lwidth = 1.4 if '-' in vpid else 0.7
+        #TODO plotTest
+        axes[1,ivpid].hist(x=ecenters,weights=wgtp,bins=ebins,\
+                           histtype='step',color='black',ls=lstyle,lw=lwidth)
+        #TODO plotTest
+        axes[1,ivpid].hist(x=ecenters,weights=wgtm,bins=ebins,\
+                           histtype='step',color='black',ls=lstyle,lw=lwidth)
+        axes[0,ivpid].bar(x=ebins[:-1],\
+                          height=np.add(errhi,np.multiply(-1,errlo)),\
+                          bottom=errlo,\
+                          width=np.diff(ebins),\
+                          align='edge', linewidth=0, color='gray',\
+                          alpha=0.25, zorder=-1)
+        axes[1,ivpid].bar(x=ebins[:-1],\
+                          height=np.add(wgtp,np.multiply(-1,wgtm)),\
+                          bottom=wgtm,\
+                          width=np.diff(ebins),\
+                          align='edge', linewidth=0, color='gray',\
+                          alpha=0.25, zorder=-1)    
+
+### ---------------------------------------------------------
+### AUX function to format error messages in get_llr and terminate
 def llrERROR(key,errtype,pardict):
     print('ERROR llr '+key+' is '+errtype+' for:')
     for key in list(pardict.keys()):
         print(key+'='+str(pardict[key]))
     sys.exit()
 
-#Fetch interpolation function for given acceptance table (Emu,efficiency)
+### ---------------------------------------------------------
+### Fetch interpolation function for given acceptance table (Emu,efficiency)
 def acctableIP(acctable):
     f = open(acctable, "r")
     Emu,eff=[],[]
@@ -293,7 +357,8 @@ def acctableIP(acctable):
     fip = interpolate.interp1d(Emu,eff,fill_value='extrapolate')
     return fip
 
-#A function to fetch low-E FS muon and IS neutrino energies per event from P8 output
+### ---------------------------------------------------------
+### Fetch low-E FS muon and IS neutrino energies per event from P8 output
 def EnuEmuDimuons():
 
     #Init
@@ -342,7 +407,8 @@ def EnuEmuDimuons():
                     Emu.append(min(EmuEvt))  #Store smallest E mu
     return [Enu,Emu]
 
-#A function to fetch low-E FS muon and IS neutrino energies per event from trident generated events
+### ---------------------------------------------------------
+### Fetch low-E FS muon and IS neutrino energies per event from trident generated events
 def EnuEmuTridents(nE,detector='FASERv2',nuid='14'):
     material = experiments[detector]['material']
     nustr='nu'
@@ -408,7 +474,8 @@ def EnuEmuTridents(nE,detector='FASERv2',nuid='14'):
                     Emu.append(min(p4_1[3],p4_2[3]))  #Store lower-E mu only
     return [Enu,Emu]
 
-#Fetch incoming nu energies, deduce bin boundaries based on the given central values
+### ---------------------------------------------------------
+### Fetch incoming nu E, deduce bin boundaries based on given central values
 def fetchEbins(proc):
     lines=[]
     Evals = []
@@ -525,19 +592,14 @@ def plotTest(plotdata,testtag,testsubdir='',mode=''):
         f.write('\n')
     f.close()
 
-    #If a reference file already exists, compare this output to that    
+    #If a reference file already exists, compare current output to it
     if not initmode:
-        xref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=0)
-        yref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=1)
-        x    = np.loadtxt(outputpath                + suffix, usecols=0)
-        y    = np.loadtxt(outputpath                + suffix, usecols=1)
-        tol=0.001
-        xagree = sum([x[i]*(1.0+tol)>xref[i] and x[i]*(1.0-tol)<xref[i]
-                      for i in range(len(x))])
-        yagree = sum([y[i]*(1.0+tol)>yref[i] and y[i]*(1.0-tol)<yref[i]
-                      for i in range(len(y))])
+        ref = np.loadtxt(outputpath + '_REFERENCE' + suffix).flatten()
+        dat = np.loadtxt(outputpath                + suffix).flatten()
+        ref = np.array([r for r in ref if not (np.isinf(r) or np.isnan(r))])
+        dat = np.array([d for d in dat if not (np.isinf(d) or np.isnan(d))])
         f = open('tests.log','a')
-        if xagree != len(x) or yagree != len(y):
+        if False in np.isclose(ref,dat).flatten():
             f.write(str(datetime.datetime.now())+' WARNING! test '+outputpath+' failed!\n')
         else: f.write(str(datetime.datetime.now())+' test '+outputpath+' passed\n')
         f.close()
