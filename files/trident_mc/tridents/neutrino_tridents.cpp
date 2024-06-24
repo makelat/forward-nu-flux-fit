@@ -2848,9 +2848,14 @@ void GenerateRandomPoint(){
     u1max = Interpolation(x1min, 192);
     // put hard cut off for the form factor
     // at some point the interpolation function becomes ureliable
-    if (x1max > 1.0){u1min = Interpolation(1.0, 192);}
-    else{u1min = Interpolation(x1max, 192);}
-    if (x1min > 1.0){u1min = Interpolation(x1min, 192);}
+    if (material.compare("proton") == 0 || material.compare("neutron") == 0){
+      if (x1max >= 198.){u1min = Interpolation(198., 192);}
+      else{u1min = Interpolation(x1max, 192);}
+      if (x1min >= 198.){u1min = Interpolation(x1min, 192);}}
+    else {
+      if (x1max >= 2.55){u1min = Interpolation(2.55, 192);}
+      else{u1min = Interpolation(x1max, 192);}
+      if (x1min >= 2.55){u1min = Interpolation(x1min, 192);}}
 
     u1 = u1min + (u1max-u1min)*realdistribution(generator);
     x1 = InverseInterpolation(u1, 192);
