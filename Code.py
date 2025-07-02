@@ -61,7 +61,7 @@ experiments = {
 ### ---------------------------------------------------------
 ### Interaction Probability
 
-def get_interaction_probability(experiment,energy, pid):
+def get_interaction_probability(experiment,energy,pid,xsprefix="xs"):
 
     # length and densitity
     rho = experiments[experiment]["rho"] # [g/cm3]
@@ -70,8 +70,8 @@ def get_interaction_probability(experiment,energy, pid):
     mN = 1.6605*10.**(-24) # [g]
         
     # cross section
-    sigma = read_and_interpolate("vxsecs/xs_"+material+"_"+pid+".txt",energy)
-       
+    sigma = read_and_interpolate("vxsecs/"+xsprefix+"_"+material+"_"+pid+".txt",energy)
+    
     # interaction probability
     prob_interact = sigma*rho*lengthcm/mN
     return prob_interact
@@ -137,6 +137,17 @@ def convert_to_root(inputfiles, filename="example.root"):
         "metakey"   : [0],
     }
 
+### ---------------------------------------------------------
+### AUX function to format error messages in get_llr and terminate
+def llrERROR(key,errtype,pardict):
+    print('ERROR llr '+key+' is '+errtype+' for:')
+    errpars = ''
+    for key in list(pardict.keys()):
+        errpars += key+'='+str(pardict[key])+'\n'
+    print(errpars)
+    sys.exit()
+
+### ---------------------------------------------------------
 #Test automation for checking that revisions reproduce previous plots
 #Param  plotdata    an object containing the data to be printed
 #       testtag     the printout filename
@@ -178,7 +189,7 @@ def plotTest(plotdata,testtag,testsubdir='',mode=''):
         f.write('\n')
     f.close()
 
-    #If a reference file already exists, compare this output to that    
+    #If a reference file already exists, compare current output to it
     if not initmode:
         xref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=0)
         yref = np.loadtxt(outputpath + '_REFERENCE' + suffix, usecols=1)
@@ -194,3 +205,23 @@ def plotTest(plotdata,testtag,testsubdir='',mode=''):
             f.write(str(datetime.datetime.now())+' WARNING! test '+outputpath+' failed!')
         else: f.write(str(datetime.datetime.now())+' test '+outputpath+' passed')
         f.close()
+
+### ---------------------------------------------------------
+#Make a vector corresponding to a histo's horizontal axis coarser by a factor 
+#e.g. 2 based on taking the average of the first and last object in the interval
+#Param x_in       bin centers
+#      factor     how much coarser to make the histo, N => combine N neighboring bins
+#      skipstart  if n.o. bins not divisible by factor, omit first bins not last bins
+#Returns a vector with fewer entries than input
+def xcoarser(x_in,factor,skipstart=False):
+    istart = len(x_in)%factor if skipstart else 0
+    x = x_in[istart:]
+    return [0.5*(x[factor*i]+x[factor*i+factor-1]) for i in range(int(len(x)/factor))]
+#Make a vector corresponding to a histo's vertical axis coarser by a factor e.g. 2
+#Param y_in       bin heights
+#      factor     how much coarser to make the histo, N => combine N neighboring bins
+#      skipstart  if n.o. bins not divisible by factor, omit first bins not last bins
+def sumcoarser(y_in,factor,skipstart=False):
+    istart = len(y_in)%factor if skipstart else 0
+    y = y_in[istart:]
+    return [ sum(y[factor*i:factor*(i+1)]) for i in range(int(len(y)/factor))]
